@@ -1,66 +1,111 @@
 package de.hhu.propra.netexample;
 
-import javax.swing.*;
+import javafx.application.Application;
+import javafx.application.Platform;
+import javafx.scene.Scene;
+import javafx.scene.control.TextArea;
+import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
+import javafx.scene.layout.BorderPane;
+import javafx.stage.Stage;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
+import java.util.Optional;
+import java.util.function.Consumer;
 
-public class Client extends JFrame {
-    BufferedReader in;
-    PrintWriter out;
-    JTextField textField = new JTextField(40);
-    JTextArea messageArea = new JTextArea(8, 40);
+public class Client extends Application {
+    private TextArea messageArea = new TextArea();
+    private TextField textField = new TextField();
 
-    public Client() {
-        messageArea.setEditable(false);
+    private BufferedReader in;
+    private PrintWriter out;
 
-        setTitle("Chat");
-        getContentPane().add(textField, "North");
-        getContentPane().add(new JScrollPane(messageArea), "Center");
-        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        pack();
+    private String serverAddress;
+    private String name;
 
-        textField.addActionListener((e) -> {
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    @Override
+    public void start(Stage primaryStage) throws Exception {
+        primaryStage.setTitle("Chat");
+
+        textField.setOnAction((event) -> {
             out.println(textField.getText());
             textField.setText("");
         });
-    }
 
-    private String showInputDialog(String message, String title) {
-        return JOptionPane.showInputDialog(this, message, title, JOptionPane.PLAIN_MESSAGE);
-    }
+        messageArea.setEditable(false);
+        messageArea.setPrefSize(800, 600);
 
-    private String getServerAddress() {
-        return showInputDialog("IP Adresse eingeben", "Willkommen");
-    }
+        BorderPane root = new BorderPane();
+        root.setCenter(messageArea);
+        root.setBottom(textField);
 
-    private String getUserName() {
-        return showInputDialog("Name eingeben", "Name");
+        primaryStage.setScene(new Scene(root));
+        primaryStage.show();
+
+        serverAddress = getServerAddress();
+
+        new Thread(() -> {
+            try {
+                run();
+            } catch (IOException e) { }
+        }).start();
     }
 
     private void run() throws IOException {
-        String serverAddress = getServerAddress();
-        Socket socket = new Socket(serverAddress, 9001);
+        Socket socket = new Socket(serverAddress, Server.PORT);
         in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         out = new PrintWriter(socket.getOutputStream(), true);
 
         while (true) {
             String line = in.readLine();
             if (line.startsWith("SUBMITNAME")) {
-                out.println(getUserName());
+                getUserName((name) -> {
+                    this.name = name;
+                    out.println(name);
+                });
             } else if (line.startsWith("NAMEACCEPTED")) {
-                textField.setEditable(true);
+                out.println(name + " hat den Raum betreten");
             } else if (line.startsWith("MESSAGE")) {
-                messageArea.append(line.substring(8) + "\n");
+                appendMessage(line.substring(8));
             }
         }
     }
 
-    public static void main(String[] args) throws Exception {
-        Client client = new Client();
-        client.setVisible(true);
-        client.run();
+    private String showInputDialog(String placeholder, String header, String text) {
+        TextInputDialog dialog = new TextInputDialog(placeholder);
+        dialog.setTitle("Chat-Example");
+        dialog.setHeaderText(header);
+        dialog.setContentText(text);
+
+        Optional<String> result = dialog.showAndWait();
+        if (result.isPresent()) {
+            return result.get();
+        }
+
+        return null;
+    }
+
+    private String getServerAddress() {
+        return showInputDialog("127.0.0.1", "IP-Adresse", "Bitte geben Sie die IP-Adresse des Servers an.");
+    }
+
+    private void getUserName(Consumer<String> callback) {
+        Platform.runLater(() -> {
+            callback.accept(showInputDialog("", "Name", "Bitte geben Sie Ihren Namen ein."));
+        });
+    }
+
+    private void appendMessage(String message) {
+        Platform.runLater(() -> {
+            messageArea.appendText(message + "\n");
+        });
     }
 }

@@ -9,7 +9,7 @@ import java.net.Socket;
 import java.util.HashSet;
 
 public class Server {
-    private static final int PORT = 9001;
+    static final int PORT = 1337;
 
     private static HashSet<String> names = new HashSet<String>();
     private static HashSet<PrintWriter> writers = new HashSet<PrintWriter>();
@@ -18,7 +18,8 @@ public class Server {
         System.out.println("The chat server is running.");
         try (ServerSocket listener = new ServerSocket(PORT)) {
             while (true) {
-                new Thread(new Handler(listener.accept())).start();
+                Socket socket = listener.accept();
+                new Thread(new Handler(socket)).start();
             }
         }
     }
@@ -54,7 +55,9 @@ public class Server {
         public void connect() throws IOException {
             getName();
             out.println("NAMEACCEPTED");
-            writers.add(out);
+            synchronized (writers) {
+                writers.add(out);
+            }
             broadcast();
         }
 
@@ -89,15 +92,18 @@ public class Server {
         @Override
         public void close() throws Exception {
             if (name != null) {
-                names.remove(name);
+                synchronized (names) {
+                    names.remove(name);
+                }
             }
             if (out != null) {
-                writers.remove(out);
+                synchronized (writers) {
+                    writers.remove(out);
+                }
             }
             try {
                 socket.close();
-            } catch (IOException e) {
-            }
+            } catch (IOException e) { }
         }
     }
 }
