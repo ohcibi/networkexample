@@ -7,19 +7,23 @@ import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.HashSet;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Server {
     static final int PORT = 1337;
 
-    private static HashSet<String> names = new HashSet<String>();
-    private static HashSet<PrintWriter> writers = new HashSet<PrintWriter>();
+    private static final HashSet<String> names = new HashSet<>();
+    private static final HashSet<PrintWriter> writers = new HashSet<>();
+
+    private static final ExecutorService executorService = Executors.newCachedThreadPool();
 
     public static void main(String[] args) throws Exception {
         System.out.println("The chat server is running.");
         try (ServerSocket listener = new ServerSocket(PORT)) {
             while (true) {
                 Socket socket = listener.accept();
-                new Thread(new Handler(socket)).start();
+                executorService.execute(new Handler(socket));
             }
         }
     }
@@ -48,8 +52,8 @@ public class Server {
 
         public ClientConnection(Socket socket) throws IOException {
             this.socket = socket;
-            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
             out = new PrintWriter(socket.getOutputStream(), true);
+            in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
         }
 
         public void connect() throws IOException {
@@ -67,8 +71,10 @@ public class Server {
                 if (input == null) {
                     return;
                 }
-                for (PrintWriter writer : writers) {
-                    writer.println("MESSAGE " + name + ": " + input);
+                synchronized (writers) {
+                    for (PrintWriter writer : writers) {
+                        writer.println("MESSAGE " + name + ": " + input);
+                    }
                 }
             }
         }
