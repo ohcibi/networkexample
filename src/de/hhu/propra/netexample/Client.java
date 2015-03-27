@@ -15,17 +15,20 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Optional;
-import java.util.function.Consumer;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 public class Client extends Application {
     private TextArea messageArea = new TextArea();
     private TextField textField = new TextField();
 
-    private BufferedReader in;
-    private PrintWriter out;
+    private ExecutorService executorService = Executors.newCachedThreadPool();
+
+    // Must be volatile (Set by client-thread, read by threadpool-thread)
+    private volatile PrintWriter out;
 
     private String serverAddress;
-    private String name;
 
     public static void main(String[] args) {
         launch(args);
@@ -36,7 +39,7 @@ public class Client extends Application {
         primaryStage.setTitle("Chat");
 
         textField.setOnAction((event) -> {
-            out.println(textField.getText());
+            sendToServer(textField.getText());
             textField.setText("");
         });
 
@@ -52,30 +55,36 @@ public class Client extends Application {
 
         serverAddress = getServerAddress();
 
-        new Thread(() -> {
-            try {
-                run();
-            } catch (IOException e) { }
-        }).start();
+        executorService.execute(this::run);
     }
 
-    private void run() throws IOException {
-        Socket socket = new Socket(serverAddress, Server.PORT);
-        in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        out = new PrintWriter(socket.getOutputStream(), true);
+    private void sendToServer(String msg) {
+        executorService.execute(() -> out.println(msg));
+    }
 
-        while (true) {
-            String line = in.readLine();
-            if (line.startsWith("SUBMITNAME")) {
-                getUserName((name) -> {
-                    this.name = name;
-                    out.println(name);
-                });
-            } else if (line.startsWith("NAMEACCEPTED")) {
-                out.println(name + " hat den Raum betreten");
-            } else if (line.startsWith("MESSAGE")) {
-                appendMessage(line.substring(8));
+    private void run() {
+        // Create resources using try-with-resources statement
+        try (Socket socket = new Socket(serverAddress, Server.PORT);
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
+
+            // Set the writer reference (volatile-flush)
+            this.out = out;
+
+            String name = "";
+
+            while (true) {
+                String line = in.readLine();
+                if (line.startsWith("SUBMITNAME")) {
+                    sendToServer(name = getUserNameLater().join());
+                } else if (line.startsWith("NAMEACCEPTED")) {
+                    sendToServer(name + " hat den Raum betreten");
+                } else if (line.startsWith("MESSAGE")) {
+                    appendMessage(line.substring(8));
+                }
             }
+        } catch (IOException e) {
+            appendMessage("[Error] " + e.getMessage());
         }
     }
 
@@ -97,15 +106,17 @@ public class Client extends Application {
         return showInputDialog("127.0.0.1", "IP-Adresse", "Bitte geben Sie die IP-Adresse des Servers an.");
     }
 
-    private void getUserName(Consumer<String> callback) {
-        Platform.runLater(() -> {
-            callback.accept(showInputDialog("", "Name", "Bitte geben Sie Ihren Namen ein."));
-        });
+    private String getUserName() {
+        return showInputDialog("", "Name", "Bitte geben Sie Ihren Namen ein.");
+    }
+
+    private CompletableFuture<String> getUserNameLater() {
+        CompletableFuture<String> future = new CompletableFuture<>();
+        Platform.runLater(() -> future.complete(getUserName()));
+        return future;
     }
 
     private void appendMessage(String message) {
-        Platform.runLater(() -> {
-            messageArea.appendText(message + "\n");
-        });
+        Platform.runLater(() -> messageArea.appendText(message + "\n"));
     }
 }
