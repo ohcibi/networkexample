@@ -28,7 +28,6 @@ public class Client extends Application {
     // Must be volatile (Set by client-thread, read by threadpool-thread)
     private volatile PrintWriter out;
 
-    private String serverAddress;
 
     public static void main(String[] args) {
         launch(args);
@@ -53,14 +52,11 @@ public class Client extends Application {
         primaryStage.setScene(new Scene(root));
         primaryStage.show();
 
-        serverAddress = getServerAddress();
-
         executorService.execute(this::run);
     }
 
     private void run() {
-        // Create resources using try-with-resources statement
-        try (Socket socket = new Socket(serverAddress, Server.PORT);
+        try (Socket socket = new Socket(getServerAddress(), Server.PORT);
              BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
              PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
 
@@ -95,35 +91,42 @@ public class Client extends Application {
         executorService.execute(() -> out.println(msg));
     }
 
-    private String showInputDialog(String placeholder, String header, String text) {
-        TextInputDialog dialog = new TextInputDialog(placeholder);
-        dialog.setTitle("Chat-Example");
-        dialog.setHeaderText(header);
-        dialog.setContentText(text);
-
-        Optional<String> result = dialog.showAndWait();
-        if (result.isPresent()) {
-            return result.get();
-        }
-
-        return null;
-    }
-
     private String getServerAddress() {
-        return showInputDialog("127.0.0.1", "IP-Adresse", "Bitte geben Sie die IP-Adresse des Servers an.");
+        return getServerAddressLater().join();
     }
 
     private String getUserName() {
-        return showInputDialog("", "Name", "Bitte geben Sie Ihren Namen ein.");
+        return getUserNameLater().join();
     }
 
     private CompletableFuture<String> getUserNameLater() {
-        CompletableFuture<String> future = new CompletableFuture<>();
-        Platform.runLater(() -> future.complete(getUserName()));
-        return future;
+        return showInputDialog("", "Name", "Bitte geben Sie Ihren Namen ein.");
+    }
+
+    private CompletableFuture<String> getServerAddressLater() {
+        return showInputDialog("127.0.0.1", "Server", "Bitte geben Sie die IP-Adresse des Chatsevers ein.");
     }
 
     private void appendMessage(String message) {
         Platform.runLater(() -> messageArea.appendText(message + "\n"));
+    }
+
+    public CompletableFuture<String> showInputDialog(String placeholder, String header, String message) {
+        CompletableFuture<String> future = new CompletableFuture<>();
+        Platform.runLater(() -> {
+            TextInputDialog dialog = new TextInputDialog(placeholder);
+            dialog.setTitle("Chat-Example");
+            dialog.setHeaderText(header);
+            dialog.setContentText(message);
+
+            Optional<String> result = dialog.showAndWait();
+            if (result.isPresent()) {
+                future.complete(result.get());
+            } else {
+                future.complete(null);
+            }
+        });
+
+        return future;
     }
 }
