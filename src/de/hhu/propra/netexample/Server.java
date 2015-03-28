@@ -63,19 +63,23 @@ public class Server {
             synchronized (writers) {
                 writers.add(out);
             }
-            broadcast();
+            startBroadcasting();
         }
 
-        private void broadcast() throws IOException {
+        private void startBroadcasting() throws IOException {
             while (true) {
                 String input = in.readLine();
                 if (input == null) {
                     return;
                 }
-                synchronized (writers) {
-                    for (PrintWriter writer : writers) {
-                        writer.println("MESSAGE " + name + ": " + input);
-                    }
+                broadcast("MESSAGE " + name + ": " + input);
+            }
+        }
+
+        private void broadcast(String message) {
+            synchronized (writers) {
+                for (PrintWriter writer : writers) {
+                    writer.println(message);
                 }
             }
         }
