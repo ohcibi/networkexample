@@ -25,9 +25,10 @@ public class Client extends Application {
 
     private ExecutorService executorService = Executors.newCachedThreadPool();
 
-    // Must be volatile (Set by client-thread, read by threadpool-thread)
+    // Volatile because those are used by all threads
     private volatile PrintWriter out;
 
+    private volatile Socket socket;
 
     public static void main(String[] args) {
         launch(args);
@@ -55,13 +56,23 @@ public class Client extends Application {
         executorService.execute(this::run);
     }
 
+    @Override
+    public void stop() throws Exception {
+        if (socket != null) {
+            socket.close();
+        }
+        executorService.shutdown();
+
+        super.stop();
+    }
+
     private void run() {
         try (Socket socket = new Socket(getServerAddress(), Server.PORT);
              BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
              PrintWriter out = new PrintWriter(socket.getOutputStream(), true)) {
 
-            // Set the writer reference (volatile-flush)
             this.out = out;
+            this.socket = socket;
 
             chat(in);
         } catch (IOException e) {
