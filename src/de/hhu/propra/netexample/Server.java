@@ -110,6 +110,9 @@ public class Server {
             synchronized (writers) {
                 writers.remove(out);
             }
+
+            broadcast("MESSAGE " + name + " has left the room");
+
             try {
                 socket.close();
             } catch (IOException ignored) { }
