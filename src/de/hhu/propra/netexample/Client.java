@@ -71,21 +71,25 @@ public class Client extends Application {
             // Set the writer reference (volatile-flush)
             this.out = out;
 
-            String name = "";
-
-            //noinspection InfiniteLoopStatement
-            while (true) {
-                String line = in.readLine();
-                if (line.startsWith("SUBMITNAME")) {
-                    sendToServer(name = getUserNameLater().join());
-                } else if (line.startsWith("NAMEACCEPTED")) {
-                    sendToServer(name + " hat den Raum betreten");
-                } else if (line.startsWith("MESSAGE")) {
-                    appendMessage(line.substring(8));
-                }
-            }
+            chat(in);
         } catch (IOException e) {
             appendMessage("[Error] " + e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("InfiniteLoopStatement")
+    private void chat(BufferedReader in) throws IOException {
+        String name = null;
+
+        while (true) {
+            String line = in.readLine();
+            if (line.startsWith("SUBMITNAME")) {
+                sendToServer(name = getUserName());
+            } else if (line.startsWith("NAMEACCEPTED")) {
+                sendToServer(name + " hat den Raum betreten");
+            } else if (line.startsWith("MESSAGE")) {
+                appendMessage(line.substring(8));
+            }
         }
     }
 
