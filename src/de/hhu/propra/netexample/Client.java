@@ -74,6 +74,8 @@ public class Client extends Application {
             chat(in);
         } catch (IOException e) {
             appendMessage("[Error] " + e.getMessage());
+        } catch (NullPointerException e) {
+            appendMessage("[Warning] Server quit");
         }
     }
 
