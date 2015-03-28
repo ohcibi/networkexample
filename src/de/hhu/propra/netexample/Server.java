@@ -21,6 +21,7 @@ public class Server {
     public static void main(String[] args) throws Exception {
         System.out.println("The chat server is running.");
         try (ServerSocket listener = new ServerSocket(PORT)) {
+            //noinspection InfiniteLoopStatement
             while (true) {
                 Socket socket = listener.accept();
                 executorService.execute(new Handler(socket));
@@ -102,14 +103,12 @@ public class Server {
                     names.remove(name);
                 }
             }
-            if (out != null) {
-                synchronized (writers) {
-                    writers.remove(out);
-                }
+            synchronized (writers) {
+                writers.remove(out);
             }
             try {
                 socket.close();
-            } catch (IOException e) { }
+            } catch (IOException ignored) { }
         }
     }
 }

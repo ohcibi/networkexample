@@ -73,6 +73,7 @@ public class Client extends Application {
 
             String name = "";
 
+            //noinspection InfiniteLoopStatement
             while (true) {
                 String line = in.readLine();
                 if (line.startsWith("SUBMITNAME")) {
