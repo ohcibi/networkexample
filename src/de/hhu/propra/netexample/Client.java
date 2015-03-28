@@ -58,10 +58,6 @@ public class Client extends Application {
         executorService.execute(this::run);
     }
 
-    private void sendToServer(String msg) {
-        executorService.execute(() -> out.println(msg));
-    }
-
     private void run() {
         // Create resources using try-with-resources statement
         try (Socket socket = new Socket(serverAddress, Server.PORT);
@@ -93,6 +89,10 @@ public class Client extends Application {
                 appendMessage(line.substring(8));
             }
         }
+    }
+
+    private void sendToServer(String msg) {
+        executorService.execute(() -> out.println(msg));
     }
 
     private String showInputDialog(String placeholder, String header, String text) {
